@@ -113,8 +113,6 @@ proj <- subsetArchRProject(proj,cells=proj$cellNames[index1],outputDirectory = p
 #filter Doublets
 proj <- addDoubletScores(proj)
 proj <- filterDoublets(proj)
-#saveRDS(proj,"combine_all_after_filter.rds")
-#proj2<-readRDS("combine_all_after_filter.rds")
 
 #######################
 #clustree was used to test the clustering of snRNA data at different resolutions
@@ -185,3 +183,5 @@ proj <- addUMAP(ArchRProj = proj,reducedDims = "Harmony",name = "UMAP",minDist =
 
 p1 <- plotEmbedding(proj, name = "Clusters", embedding = "UMAP", labelAsFactors=F,plotAs="points",size = 0.000000001, labelMeans=T,rastr = FALSE)
 p2 <- plotEmbedding(proj, name = "tissue", embedding = "UMAP", labelAsFactors=F,plotAs="points",size = 0.000000001, labelMeans=F,rastr = FALSE)
+
+saveRDS(proj,"combine_all_after_filter.rds")
