@@ -57,3 +57,5 @@ p_main <- plotEmbedding(proj, name = "main",embedding ="UMAP",labelAsFactors=F,s
 p_rna <- plotEmbedding(proj, name = "main",embedding ="UMAP_RNA_0.6",labelAsFactors=F,size = 0.000001,labelMeans=F,legendSize=10,rastr = FALSE)
 
 p_atac <- plotEmbedding(proj, name = "main",embedding ="UMAP_ATAC_0.6",labelAsFactors=F,size = 0.000001,labelMeans=F,legendSize=10,rastr = FALSE)
+
+saveRDS(proj, file = "combine_all_new_fig1_end.rds")

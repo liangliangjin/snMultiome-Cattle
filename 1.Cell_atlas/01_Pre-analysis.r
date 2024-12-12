@@ -184,4 +184,4 @@ proj <- addUMAP(ArchRProj = proj,reducedDims = "Harmony",name = "UMAP",minDist =
 p1 <- plotEmbedding(proj, name = "Clusters", embedding = "UMAP", labelAsFactors=F,plotAs="points",size = 0.000000001, labelMeans=T,rastr = FALSE)
 p2 <- plotEmbedding(proj, name = "tissue", embedding = "UMAP", labelAsFactors=F,plotAs="points",size = 0.000000001, labelMeans=F,rastr = FALSE)
 
-saveRDS(proj,"combine_all_after_filter.rds")
+saveRDS(proj, file = "combine_all_after_filter.rds")
