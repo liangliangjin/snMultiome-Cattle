@@ -16,11 +16,10 @@ gene_anno$transcript <- gene_anno$transcript_id
 gene_anno$symbol <- gene_anno$gene_name
 
 #########################
-#2.Run Seurat to CDS Format
+#2. Seurat to CDS Format and Run Cicero
 #########################
-
 cattle_cicero <- readRDS("cattle_cicero.rds")
-
+conns <- run_cicero(cattle_cicero, chromosome_length)
 head(conns)
 #3. Finding cis-Co-accessibility Networks (CCANS)
 ccans <- cicero::generate_ccans(conns)
@@ -28,7 +27,13 @@ ccans <- cicero::generate_ccans(conns)
 saveRDS(conns, file = "./Outputs/conns.rds")
 saveRDS(ccans, file = "./Outputs/ccans.rds")
 
-all_peaks <- row.names(exprs(brain_cds))
+all_peaks <- row.names(exprs(cds))
 write.csv(x = all_peaks, file = "./Outputs/all_peaks.csv")
 write.csv(x = conns, file = "./Outputs/cicero_connections.csv")
+
+links <- ConnectionsToLinks(conns=conns, ccans=ccans)
+Links(SeuratObject) <- links
+
+save(list=ls(),file="cicero.RData")
+message("all done!")
 message("all done!")

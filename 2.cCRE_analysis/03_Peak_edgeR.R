@@ -40,7 +40,7 @@ for (temp_celltype in celltype_list){
 #Run the same edgeR process for Mongolian cattle
 ###########
 
-# edgeR test for cross-species comparision
+# edgeR test for cross-subspecies comparision
 bcv = 0.1
 for (temp_celltype in celltype_list){
     Used_order = c()

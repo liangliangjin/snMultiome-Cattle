@@ -63,6 +63,7 @@ SeuratObject <- addTwoDimRed(
   reducedDims2 = "Harmony" 
 )
 SeuratObject <- Seurat::FindVariableFeatures(SeuratObject,nfeatures=nrow(SeuratObject[['peaks']]))
+SeuratObject <- Seurat::FindVariableFeatures(SeuratObject,assay='RNA',nfeatures=nrow(SeuratObject@assays$RNA))
 saveRDS(SeuratObject,file="SeuratObject.rds")
 
 

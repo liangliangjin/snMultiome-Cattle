@@ -35,7 +35,7 @@ for temp_celltype in celltype_list:
         if os.path.exists('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt'):
             Cross_df = pd.read_csv('Res/'+temp_celltype+'_Cross_IvsT.txt', sep='\t')
             Cross_df = Cross_df.loc[Cross_df['padj']<0.05,]
-            Cross_df = Cross_df.loc[Cross_df['logFC']<0,]
+            Cross_df = Cross_df.loc[Cross_df['logFC']>0,]
             print(temp_celltype, Human_df.shape, Cross_df.shape)
             Used_peak = np.intersect1d(Human_df.index, Cross_df.index)
             Used_df = Human_df.loc[Used_peak, ]
