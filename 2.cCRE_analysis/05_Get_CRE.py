@@ -6,17 +6,17 @@ celltype_list = ['Nerve-cell-Neuron', 'Endothelial-cell-Cardiac-endothelial-cell
 
 # Get cell type specific cCRE Set (leiqiong)
 for temp_celltype in celltype_list:
-    if os.path.exists('Res/'+temp_celltype+'_leiqiong.txt'):
-        Human_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_leiqiong.txt', sep='\t')
-        Human_df = Human_df.loc[Human_df['padj']<0.05,]
-        Human_df = Human_df.loc[Human_df['logFC']<0,]
+    if os.path.exists('./Res/'+temp_celltype+'_leiqiong.txt'):
+        cattle_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_leiqiong.txt', sep='\t')
+        cattle_df = cattle_df.loc[cattle_df['padj']<0.05,]
+        cattle_df = cattle_df.loc[cattle_df['logFC']<0,]
         if os.path.exists('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt'):
             Cross_df = pd.read_csv('Res/'+temp_celltype+'_Cross_IvsT.txt', sep='\t')
             Cross_df = Cross_df.loc[Cross_df['padj']<0.05,]
             Cross_df = Cross_df.loc[Cross_df['logFC']<0,]
-            print(temp_celltype, Human_df.shape, Cross_df.shape)
-            Used_peak = np.intersect1d(Human_df.index, Cross_df.index)
-            Used_df = Human_df.loc[Used_peak, ]
+            print(temp_celltype, cattle_df.shape, Cross_df.shape)
+            Used_peak = np.intersect1d(cattle_df.index, Cross_df.index)
+            Used_df = cattle_df.loc[Used_peak, ]
             Used_df = Used_df.sort_values(by='padj')
             print(Used_df.shape)
             Used_df['chr'] = [x.split('_')[0] for x in Used_df.index]
@@ -28,17 +28,17 @@ for temp_celltype in celltype_list:
 
 # Get cell type specific cCRE Set (mongolian)
 for temp_celltype in celltype_list:
-    if os.path.exists('Res/'+temp_celltype+'_mongolian.txt'):
-        Human_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_mongolian.txt', sep='\t')
-        Human_df = Human_df.loc[Human_df['padj']<0.05,]
-        Human_df = Human_df.loc[Human_df['logFC']<0,]
+    if os.path.exists('./Res/'+temp_celltype+'_mongolian.txt'):
+        cattle_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_mongolian.txt', sep='\t')
+        cattle_df = cattle_df.loc[cattle_df['padj']<0.05,]
+        cattle_df = cattle_df.loc[cattle_df['logFC']<0,]
         if os.path.exists('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt'):
             Cross_df = pd.read_csv('Res/'+temp_celltype+'_Cross_IvsT.txt', sep='\t')
             Cross_df = Cross_df.loc[Cross_df['padj']<0.05,]
             Cross_df = Cross_df.loc[Cross_df['logFC']>0,]
-            print(temp_celltype, Human_df.shape, Cross_df.shape)
-            Used_peak = np.intersect1d(Human_df.index, Cross_df.index)
-            Used_df = Human_df.loc[Used_peak, ]
+            print(temp_celltype, cattle_df.shape, Cross_df.shape)
+            Used_peak = np.intersect1d(cattle_df.index, Cross_df.index)
+            Used_df = cattle_df.loc[Used_peak, ]
             Used_df = Used_df.sort_values(by='padj')
             print(Used_df.shape)
             Used_df['chr'] = [x.split('_')[0] for x in Used_df.index]
@@ -46,4 +46,39 @@ for temp_celltype in celltype_list:
             Used_df['end'] = [int(x.split('_')[2]) for x in Used_df.index]
             if len(Used_df)>0:
                 Used_df.loc[:, ['chr','start','end','logFC','padj']].to_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE/DAcCRE_celltype/'+temp_celltype+'_mongolian.txt', sep='\t', index=None, header=None)
+
+
+
+# Get cell type specific cCRE Set (cattle)
+for temp_celltype in celltype_list:
+    if os.path.exists('/home/Jingliangliang/SC/Peak_df/DA_CRE_Onlycelltypes/Res/'+temp_celltype+'.txt'):
+        cattle_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE_Onlycelltypes/Res/'+temp_celltype+'.txt', sep='\t')
+        cattle_df = cattle_df.loc[cattle_df['padj']<0.05,]
+        cattle_df = cattle_df.loc[cattle_df['logFC']<0,]
+        print(temp_celltype, cattle_df.shape)
+        Used_df = cattle_df
+        Used_df = Used_df.sort_values(by='padj')
+        print(Used_df.shape)
+        Used_df['chr'] = [x.split('_')[0] for x in Used_df.index]
+        Used_df['start'] = [int(x.split('_')[1]) for x in Used_df.index]
+        Used_df['end'] = [int(x.split('_')[2]) for x in Used_df.index]
+        if len(Used_df)>0:
+            Used_df.loc[:, ['chr','start','end','logFC','padj']].to_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE_Onlycelltypes/Res/P005/'+temp_celltype+'_P005.txt', sep='\t', index=None, header=None)
+
+final_df = pd.DataFrame()
+for temp_celltype in celltype_list:
+    if os.path.exists('/home/Jingliangliang/SC/Peak_df/DA_CRE_Onlycelltypes/Res/'+temp_celltype+'.txt'):
+        cattle_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE_Onlycelltypes/Res/'+temp_celltype+'.txt', sep='\t')
+        cattle_df['value'] = ((cattle_df['padj'] < 0.05) & (cattle_df['logFC'] < 0)).astype(int)
+        column_name = temp_celltype
+        final_df[column_name] = cattle_df['value']
+        count_1 = (cattle_df['value'] == 1).sum()
+        print(f'{temp_celltype}: {count_1} rows where padj < 0.05 and logFC < 0')
+
+final_df['chr'] = [x.split('_')[0] for x in cattle_df.index]
+final_df['start'] = [int(x.split('_')[1]) for x in cattle_df.index]
+final_df['end'] = [int(x.split('_')[2]) for x in cattle_df.index]
+final_df = final_df[['chr', 'start', 'end'] + [col for col in final_df.columns if col not in ['chr', 'start', 'end']]]
+final_df.to_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE_Onlycelltypes/merged_results.txt', sep='\t', index=False)
+
 

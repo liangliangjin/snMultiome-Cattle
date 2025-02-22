@@ -1,3 +1,50 @@
+###########
+#EdgeR process - only celltypes is considered
+###########
+library(edgeR)
+library(stringr)
+celltype_list <- readLines("celltype_list")
+Used_order = c()
+#leiqiong_Sample = c('brain', 'heart', 'kidney', 'lung', 'muscle','spleen0', 'skin0', 'rumen', 'fat0', 'liver0', 'ovary', 'testis')
+for (temp_celltype in celltype_list) {
+    if (file.exists(paste0('./DA_CRE_Onlycelltypes/',temp_celltype, '.txt'))) {
+        Used_order <- c(Used_order, temp_celltype)
+    }
+}
+bcv = 0.1
+for (temp_celltype in celltype_list){
+    Count_df = read.delim('./DA_CRE_Onlycelltypes/cattle_df.txt', sep='\t', row.names=1)
+    Used_celltype = c()
+    for (it in Used_order){
+        if (it==temp_celltype){
+            Used_celltype = c(Used_celltype, temp_celltype)
+        }
+        else{
+            Used_celltype = c(Used_celltype, 'Other')
+        }
+    }
+    Count_df = Count_df[, gsub("\\.","-",colnames(Count_df))%in%Used_order]
+    meta = data.frame(Celltype=Used_celltype, row.names=Used_order)
+    if(length(unique(meta$Celltype))>1){
+    data.use = as.matrix(Count_df)
+    group <- factor(meta$Celltype)
+    design <- model.matrix(~group)
+    y <- DGEList(counts=data.use, group=group)
+    tb.pos <- exactTest(y, dispersion=bcv^2)$table;
+    tb.pos$padj = p.adjust(tb.pos$PValue, method = 'hochberg')
+    output_file = paste0('./DA_CRE_Onlycelltypes/Res/', temp_celltype, '.txt')
+    write.table(tb.pos, output_file, sep='\t', quote=FALSE)
+	print(paste0("save ",output_file))
+	}
+}
+
+
+
+
+
+###########
+#EdgeR process for Leiqiong cattle
+###########
 library(edgeR)
 library(stringr)
 celltype_list <- readLines("celltype_list")

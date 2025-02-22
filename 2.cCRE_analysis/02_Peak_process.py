@@ -41,7 +41,18 @@ for temp_celltype in celltype_list:
         print(f"No data for {temp_celltype}, skipping save.")
 
 
+##cattle_df
+cattle_df = pd.DataFrame()
+for temp_celltype in celltype_list:
+    if os.path.exists(temp_celltype+'.txt'):
+        temp_cattle = pd.read_csv(temp_celltype+'.txt', sep='\t', index_col=0)
+        temp_cattle.columns = [temp_celltype] * temp_cattle.shape[1]
+        cattle_df = pd.concat([cattle_df, temp_cattle], axis=1)
+        print(temp_celltype)
 
+cattle_df.to_csv('~/SC/Peak_df/DA_CRE_Onlycelltypes/cattle_df.txt', sep='\t')
+
+##
 
 leiqiong_df = pd.DataFrame()
 for temp_celltype in celltype_list:

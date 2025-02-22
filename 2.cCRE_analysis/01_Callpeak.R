@@ -52,10 +52,11 @@ cellnames <- Count_peaks
 datafr = sparseMatrix(i=temp_df$Peaks, j=temp_df$Cells, x=1)
 colnames(datafr) = peaknames
 rownames(datafr) = cellnames
+#Samples and celltypes
 for (temp_sample in Samples){
     for (temp_celltype in celltype_list){
         output_file = paste0("Peak_df/DA_CRE/",temp_sample, '_', temp_celltype, '.txt')
-        Used_meta = meta[meta$main==temp_celltype, ]
+        Used_meta = meta[gsub("/| ","-",meta$main)==temp_celltype, ]
         Used_meta = Used_meta[Used_meta$Sample==temp_sample,]
         Used_cell = row.names(Used_meta)
 		if(length(Used_cell)>1){
@@ -63,5 +64,13 @@ for (temp_sample in Samples){
         write.table(Bulk_df, output_file, sep='\t', quote=FALSE)}
     }
 }
-
+#Only celltypes
+for (temp_celltype in celltype_list){
+	output_file = paste0("Peak_df/DA_CRE_Onlycelltypes/",temp_celltype, '.txt')
+	Used_meta = meta[gsub("/| ","-",meta$main)==temp_celltype, ]
+	Used_cell = row.names(Used_meta)
+	if(length(Used_cell)>1){
+	Bulk_df = rowSums(datafr[,Used_cell])
+	write.table(Bulk_df, output_file, sep='\t', quote=FALSE)}
+}
 
