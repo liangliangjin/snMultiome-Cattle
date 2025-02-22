@@ -13,14 +13,14 @@ phast <- phastCons100way.UCSC.hg38
 set[set$hg==1,(ncol(set)+1):(ncol(set)+3)] <- bos_Hg38
 names(set)[(ncol(set)-2):ncol(set)] <- c("hg_chr", "hg_start", "hg_end")
 
-mam_index<-(set$hg==1&set$mm==1&set$pig==1&set$horse==1&set$sheep==1)
-mam<-paste(set$hg_chr[mam_index],paste(set$hg_start[mam_index],set$hg_end[mam_index],sep="-"),sep=":")
+mam_index <- (set$hg==1&set$mm==1&set$pig==1&set$horse==1&set$sheep==1)
+mam <- paste(set$hg_chr[mam_index],paste(set$hg_start[mam_index],set$hg_end[mam_index],sep="-"),sep=":")
 
-GRanges_mam<-GRanges(mam)
-mam_score<-gscores(phast, GRanges_mam)
+GRanges_mam <- GRanges(mam)
+mam_score <- gscores(phast, GRanges_mam)
 
-set_mm<-set[mam_index,]
-set_mm$mam_score<-mam_score$default
+set_mm <- set[mam_index,]
+set_mm$mam_score <- mam_score$default
 
 mam_liftover_list <- list()
 for (i in 1:5) {
@@ -40,7 +40,7 @@ phastCons_plot <- plot_list[[1]] + plot_list[[2]] + plot_list[[3]] + plot_list[[
 print(phastCons_plot)
 
 ###################################phyloP score
-set_mm2<-set_mm[, c("hg_chr", "hg_start", "hg_end")]
+set_mm2 <- set_mm[, c("hg_chr", "hg_start", "hg_end")]
 write.table(set_mm2,file="/storage/public/home/2021060195/02.phyloP/region_file.bed",sep="\t",col.names = F,row.names = F,quote = FALSE)
 
 
