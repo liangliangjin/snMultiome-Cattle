@@ -6,8 +6,8 @@ library(GenomicRanges)
 library(phastCons100way.UCSC.hg38)
 phast <- phastCons100way.UCSC.hg38
 
-hg_index<-set1$Hg==1
-mm_index<-set1$mm==1
+# set <- readRDS("set.rds") 
+# bos_Hg38 <- read.table("bos_0.5_Hg38.bed", sep = "",header=F)
 
 # Writes the sequence after liftover conversion
 set[set$hg==1,(ncol(set)+1):(ncol(set)+3)] <- bos_Hg38
@@ -42,6 +42,16 @@ print(phastCons_plot)
 ###################################phyloP score
 set_mm2<-set_mm[, c("hg_chr", "hg_start", "hg_end")]
 write.table(set_mm2,file="/storage/public/home/2021060195/02.phyloP/region_file.bed",sep="\t",col.names = F,row.names = F,quote = FALSE)
+
+
+# run 01.bw2bed.sh
+	# Step 1: BigWig to bed file.
+	# Step 2: Chromosomal resolution of phyloP file.
+	# Step 3: Bedtools intersect.
+	# Step 4: Add line numbers and sort.
+	# Step 5: Chromosomal resolution of region file.
+# run 02.cal.R
+	# Calculate the phyloP score for each CRE.
 ##################
 setwd("/storage/public/home/2021060195/02.phyloP")
 library(data.table)
