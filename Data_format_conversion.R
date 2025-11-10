@@ -1,5 +1,4 @@
-########################ArchRtoSignac Format
-#https://github.com/swaruplabUCI/ArchRtoSignac/tree/main
+########################ArchR to Signac Format
 library(ArchR)
 library(Seurat)
 library(SingleCellExperiment)
@@ -15,7 +14,7 @@ seqlevels(annotations) <- paste0('chr', seqlevels(annotations))
 
 pkm <- getPeakMatrix(proj)
 
-#annotations<-readRDS("/home/Jingliangliang/SC/annotations_ARS.rds")
+#annotations<-readRDS("~/SC/annotations_ARS.rds")
 fragments_dirs <- as.list(paste0("/home/Jingliangliang/SC/",unique(proj@cellColData$Sample),"/outs/"))
 SeuratObject <- ArchR2Signac(
   ArchRProject = proj,
@@ -44,7 +43,6 @@ getRNAMatrix <- function(
     select = NULL,
     ignoreCase = TRUE
   )
-  # set the column names for gsm
   colnames(gsm) <- gsub("#", "_", colnames(gsm))
   ix <- match(colnames(SeuratObject), colnames(gsm))
   gsm <- gsm[,ix]
@@ -62,8 +60,8 @@ SeuratObject <- addTwoDimRed(
   reducedDims1 = "LSI_Combined",
   reducedDims2 = "Harmony" 
 )
-SeuratObject <- Seurat::FindVariableFeatures(SeuratObject,nfeatures=nrow(SeuratObject[['peaks']]))
-SeuratObject <- Seurat::FindVariableFeatures(SeuratObject,assay='RNA',nfeatures=nrow(SeuratObject@assays$RNA))
+SeuratObject <- Seurat::FindVariableFeatures(SeuratObject,nfeatures=2000)
+SeuratObject <- Seurat::FindVariableFeatures(SeuratObject,assay='RNA',nfeatures=2000)
 saveRDS(SeuratObject,file="SeuratObject.rds")
 
 

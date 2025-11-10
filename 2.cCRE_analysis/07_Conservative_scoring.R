@@ -79,7 +79,8 @@ for (i in 1:5) {
   plot_list2[[i]] <- ggplot(d, aes(x = score)) +
     geom_density(fill = "#ADD8E6", adjust = 0.5) +
     theme(panel.background = element_rect(fill = "white")) +
-	xlim(-2.5, 5) + ylim(0, 1.5)
+	xlim(-1, 1) + ylim(0, 1.5) +
+	geom_vline(xintercept = 0, linetype = "dashed", color = "black")
 }
 phyloP_plot <- plot_list2[[1]] + plot_list2[[2]] + plot_list2[[3]] + plot_list2[[4]] + plot_list2[[5]]
 print(phyloP_plot)

@@ -1,5 +1,9 @@
 library(Seurat)
+library(Signac)
+library(AnnotationHub)
 library(ArchR)
+library(SingleCellExperiment)
+library(harmony)
 addArchRThreads(threads = 16)
 
 #Read cattle genome data and reference files
@@ -115,43 +119,9 @@ proj <- addDoubletScores(proj)
 proj <- filterDoublets(proj)
 
 #######################
-#clustree was used to test the clustering of snRNA data at different resolutions
-library(cowplot)
-library(DoubletFinder)
-library(clustree)
-library(harmony)
-options(future.globals.maxSize = 1000 * 1024^2)
-process_seurat_objects <- function(seurat_objects) {
-  seurat_objects_transformed <- lapply(seurat_objects, function(obj) {
-    SCTransform(obj, verbose = FALSE,return.only.var.genes=FALSE)
-  })
-  features <- SelectIntegrationFeatures(object.list = seurat_objects_transformed, nfeatures = 2000)
-  seurat.combined <- Reduce(function(x, y) merge(x, y), seurat_objects_transformed)
-  seurat.combined2 <- subset(seurat.combined, cells = proj$cellNames)
-  sample <- subset(seurat.combined2, subset = nFeature_RNA > 200 & percent.mt < 5)
-  sample <- RunPCA(sample, npcs = 30, features = features, verbose = FALSE)
-  group_labels <- sub("#.*", "", colnames(sample))
-  sample@meta.data$group <- group_labels
-  sample <- sample %>% RunHarmony("group",plot_convergence = TRUE)
-  return(sample)
-}
-sample <- process_seurat_objects(seurat_objects)
-sample <- sample %>%
-  RunUMAP(reduction = "harmony", dims = 1:30, n.neighbors = 10, min.dist = 0.5) %>%
-  FindNeighbors(reduction = "harmony", dims = 1:30) %>%
-  FindClusters(resolution = 0) %>%
-  identity()
-#DimPlot(sample, label = TRUE)
-sample.final <- FindClusters(
-    object = sample,
-    resolution = c(seq(0,0.8,.1))
-)
-clustree<-clustree(sample.final@meta.data, prefix = "SCT_snn_res.")
-clustree
-
 #snMultiome dimension reduction
 set.seed(1)
-set_resolution <- 0.6
+set_resolution <- 0.8
 proj <-addIterativeLSI(ArchRProj = proj, 
     clusterParams = list(
       resolution = set_resolution, 
@@ -162,26 +132,57 @@ proj <-addIterativeLSI(ArchRProj = proj,
     useMatrix = "TileMatrix", 
     depthCol = "nFrags",force = TRUE,
     name = paste0("LSI_ATAC_",set_resolution))
-##RNA-LSI
-proj <- addIterativeLSI(ArchRProj = proj,clusterParams = list(resolution = set_resolution,sampleCells = 10000,n.start = 10),saveIterations = FALSE,useMatrix = "GeneExpressionMatrix",depthCol = "Gex_nUMI",varFeatures = 2500,firstSelection = "variable",binarize = FALSE,force = TRUE,name = paste0("LSI_RNA_",set_resolution))
-#combined
-proj <- addCombinedDims(proj, reducedDims = c(paste0("LSI_ATAC_",set_resolution), paste0("LSI_RNA_",set_resolution)), name = "LSI_Combined")
-#Harmony
+
+proj <- addHarmony(ArchRProj = proj,reducedDims = paste0("LSI_ATAC_",set_resolution),name = "Harmony_ATAC",groupBy = c("Clusters3","Sample"),force = TRUE)
+
 proj$Clusters3 <- ifelse(grepl("2", proj$Sample), "Mongolian", "Leiqiong")
 proj$tissue <- gsub("[0-9]", "", proj$Sample)
 #proj$tissue <- gsub("fat", "Adipose", proj$tissue)
-#Harmony and clustering
-proj <- addHarmony(ArchRProj = proj,reducedDims = "LSI_Combined",name = "Harmony",groupBy = c("Sample"),lambda = 0.6,corCutOff = 0.7,force = TRUE)
-proj <- addClusters(proj,reducedDims = "Harmony", method = "Seurat",name = "Clusters",resolution =set_resolution,maxClusters = NULL,force = TRUE)
-proj <- addHarmony(ArchRProj = proj,reducedDims = paste0("LSI_RNA_",set_resolution),name = "Harmony_RNA",groupBy = c("Clusters3","Sample"),force = TRUE)
-proj <- addHarmony(ArchRProj = proj,reducedDims = paste0("LSI_ATAC_",set_resolution),name = "Harmony_ATAC",groupBy = c("Clusters3","Sample"),force = TRUE)
-proj <- addClusters(proj,reducedDims = "Harmony_ATAC", method = "Seurat",name = "Clusters_ATAC",resolution =set_resolution,maxClusters = NULL,force = TRUE)
-proj <- addClusters(proj,reducedDims = "Harmony_RNA", method = "Seurat",name = "Clusters_RNA",resolution =set_resolution,maxClusters = NULL,force = TRUE)
 
+##RNA-LSI
+##!Due to the limitations of LSI, RNA dimensionality reduction was changed to be conducted in Seurat.
+##After ArchR2Seurat (see Data_format_conversion.R)
+DefaultAssay(SeuratObject) <- "RNA"
+SeuratObject <- SCTransform(SeuratObject, verbose = FALSE) %>% 
+	RunPCA() %>% 
+	RunHarmony(group.by.vars = "Sample", reduction = "pca", reduction.save = "harmony_rna",dims.use = 1:30) %>% 
+	RunUMAP(dims = 1:30, reduction = "harmony_rna", reduction.name = 'umap.rna', reduction.key = 'rnaUMAP_')
 
-proj <- addUMAP(ArchRProj = proj,reducedDims = "Harmony",name = "UMAP",minDist = 0.4,n_neighbors=100,metric ="euclidean",force = TRUE)
+colnames(SeuratObject) <- sub("_", "#", colnames(SeuratObject))
+LSI_ATAC<- getReducedDims(proj, reducedDims ="Harmony_ATAC", returnMatrix = TRUE)
 
-p1 <- plotEmbedding(proj, name = "Clusters", embedding = "UMAP", labelAsFactors=F,plotAs="points",size = 0.000000001, labelMeans=T,rastr = FALSE)
-p2 <- plotEmbedding(proj, name = "tissue", embedding = "UMAP", labelAsFactors=F,plotAs="points",size = 0.000000001, labelMeans=F,rastr = FALSE)
+if(all(rownames(LSI_ATAC) %in% colnames(SeuratObject))){
+	SeuratObject[["harmony_atac"]] <- CreateDimReducObject(
+		embeddings = as.matrix(LSI_ATAC),
+		key = "LSIATAC_",
+		assay = "peaks"
+	)}
+
+SeuratObject <- FindMultiModalNeighbors(SeuratObject, reduction.list = list("harmony_rna", "harmony_atac"), dims.list = list(1:30, 2:30))
+SeuratObject <- RunUMAP(SeuratObject, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+SeuratObject <- FindClusters(SeuratObject, graph.name = "wsnn", algorithm = 3, verbose = FALSE)
+#Add the Suerat data to the Archr project
+#reduction
+harmony_rna_mat <- Embeddings(SeuratObject, reduction = "harmony_rna")[, 1:30]
+harmony_rna_mat <- harmony_rna_mat[proj$cellNames, ]
+rna_reducedDims <- proj@reducedDims$Harmony_ATAC
+rna_reducedDims@listData$matDR <- harmony_rna_mat
+rna_reducedDims@listData$date <- Sys.time()
+proj@reducedDims$harmony_rna <- rna_reducedDims
+proj <- addCombinedDims(proj, reducedDims = c("harmony_rna","Harmony_ATAC"), name = "Harmony")
+#wnn.umap
+seurat.umap <- SeuratObject@reductions$wnn.umap
+seurat.umap.df <- DataFrame(row.names=proj$cellNames, "seurat#UMAP1" = seurat.umap@cell.embeddings[proj$cellNames, "wnnUMAP_1"], "seurat#UMAP2" =  seurat.umap@cell.embeddings[proj$cellNames, "wnnUMAP_2"], check.names = FALSE)
+seurat.umap.df$cn <- rownames(seurat.umap.df)
+ArchR.meta <- proj@cellColData
+ArchR.meta$cn <- rownames(ArchR.meta)
+ordered.coords <- merge(ArchR.meta, seurat.umap.df, by = "cn")[, c("seurat#UMAP1", "seurat#UMAP2", "cn")]
+rownames(ordered.coords) <- ordered.coords$cn
+ordered.coords$cn <- NULL
+proj@embeddings$UMAP_wnn <- SimpleList(df = seurat.umap.df, params = list())
+#clusters
+wnn_clusters <- SeuratObject$seurat_clusters
+wnn_clusters <- wnn_clusters[proj$cellNames]
+proj$WNN_Clusters <- wnn_clusters
 
 saveRDS(proj, file = "combine_all_after_filter.rds")

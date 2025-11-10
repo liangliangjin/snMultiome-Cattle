@@ -1,3 +1,95 @@
+# Set2: Breed-specific CRE
+library(edgeR)
+library(GenomicRanges)
+output_dir <- "./Peak_df/DA_CRE/DAcCRE_breed_specific/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+leiqiong_df <- read.delim("./Peak_df/DA_CRE/Settings/leiqiong_df.txt", row.names = 1, check.names = FALSE)
+mongolian_df <- read.delim("./Peak_df/DA_CRE/Settings/mongolian_df.txt", row.names = 1, check.names = FALSE)
+meta <- readRDS("meta.rds") 
+
+
+all_counts <- cbind(leiqiong_df, mongolian_df)
+group <- factor(c(rep("leiqiong", ncol(leiqiong_df)), rep("mongolian", ncol(mongolian_df))), levels = c("leiqiong", "mongolian"))
+
+y <- DGEList(counts = all_counts, group = group)
+CPM <- cpm(y)
+keep <- rowSums(CPM > 2)
+y <- y[keep, , keep.lib.sizes = FALSE]
+
+y <- calcNormFactors(y)
+bcv <- 0.1
+et <- exactTest(y, dispersion = bcv^2)
+res <- et$table
+res$padj <- p.adjust(res$PValue, method = "BH")
+
+CPM <- cpm(y, normalized.lib.sizes = TRUE, log = FALSE)
+binMat <- (CPM > 5) * 1
+open_prop_leiqiong <- rowSums(binMat[, group == "leiqiong"]) / sum(group == "leiqiong")
+open_prop_mongolian <- rowSums(binMat[, group == "mongolian"]) / sum(group == "mongolian")
+
+res$open_prop_leiqiong <- open_prop_leiqiong[rownames(res)]
+res$open_prop_mongolian <- open_prop_mongolian[rownames(res)]
+res$avg_CPM <- rowMeans(CPM)[rownames(res)]
+
+leiqiong_specific <- res[res$logFC < -1 & res$padj < 0.01 & res$open_prop_leiqiong > 0.3 & res$avg_CPM > 5, ]
+leiqiong_specific <- leiqiong_specific[order(leiqiong_specific$logFC), ]
+
+mongolian_specific <- res[res$logFC > 1 & res$padj < 0.01 & res$open_prop_mongolian > 0.3 & res$avg_CPM > 5, ]
+mongolian_specific <- mongolian_specific[order(mongolian_specific$logFC, decreasing = TRUE), ] 
+
+parse_genomic_coordinates <- function(peak_names) {
+    coords <- strsplit(peak_names, "_")
+    chr_index <- which(sapply(coords[[1]], function(x) grepl("chr", x)))[1]
+    chr <- sapply(coords, function(x) x[chr_index])
+    start <- as.numeric(sapply(coords, function(x) x[chr_index + 1]))
+    end <- as.numeric(sapply(coords, function(x) x[chr_index + 2]))
+    return(data.frame(chr = chr, start = start, end = end))
+}
+leiqiong_df <- parse_genomic_coordinates(rownames(leiqiong_specific))
+leiqiong_gr <- GRanges(
+  seqnames = leiqiong_df$chr,
+  ranges = IRanges(start = leiqiong_df$start, end = leiqiong_df$end),
+  strand = "*",
+  leiqiong_specific
+)
+mongolian_df <- parse_genomic_coordinates(rownames(mongolian_specific))
+mongolian_gr <- GRanges(
+  seqnames = mongolian_df$chr,
+  ranges = IRanges(start = mongolian_df$start, end = mongolian_df$end),
+  strand = "*",
+  mongolian_specific
+)
+
+leiqiong_specific_anno <- fastAnnoPeaks(peaks=leiqiong_gr)
+mongolian_specific_anno <- fastAnnoPeaks(peaks=mongolian_gr)
+
+write.table(leiqiong_specific_anno, paste0(output_dir, "leiqiong_specific_anno.txt"), sep="\t", row.names = F, quote=FALSE)
+write.table(mongolian_specific_anno, paste0(output_dir, "mongolian_specific_anno.txt"), sep="\t", row.names = F, quote=FALSE)
+
+message("Finished broad CRE analysis for both breeds.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 library(data.table)
 
 merged_data <- fread("merged_results.txt")
@@ -62,7 +154,7 @@ assign_conservation_level <- function(data, celltype_groups) {
 			}
 		}
 		
-		p_values_name2 <- p_values_name[p_values < 0.05]
+		p_values_name2 <- p_values_name[p_values < 0.01]
 		groups_involved <- strsplit(p_values_name2, "-")
 		cross <- Reduce(intersect, groups_involved)
 		
