@@ -8,7 +8,7 @@ file_list <- list.files("./Peak_df/DA_CRE_Onlycelltypes/Res", pattern = "\\.txt$
 edgeR_list <- map(file_list, function(file) {
   data <- fread(file)
   setnames(data, 1, "CRE")
-  data[padj < 0.01 & logFC < 0]
+  data[padj < 0.01 & logFC < 1]
 })
 names(edgeR_list) <- gsub("\\.txt$", "", basename(file_list))
 
@@ -150,6 +150,7 @@ markerlistmaker <- function(markering, daps){
   if(colnames(markering)[i] %in% names(daps)){
     commoners <- intersect(rownames(daps[[match(colnames(markering)[i], names(daps))]]), rownames(markering))
     markerlist[[i]] <- markering[match(commoners, rownames(markering)), i]
+	names(markerlist[[i]]) <- rownames(markering)[match(commoners, rownames(markering))]
     betamarkerlist[[i]] <- daps[[match(colnames(markering)[i], names(daps))]][match(commoners, rownames(daps[[match(colnames(markering)[i], names(daps))]])), c("binomial_beta")]
     nonmarkerlist[[i]] <- markering[-match(commoners, rownames(markering)), i]
     names(markerlist)[i] <- colnames(markering)[i]
@@ -173,7 +174,7 @@ markerlists <- markerlistmaker(markering, intersection_results)
 
 nulldist = log10(as.numeric(unlist(markerlists$nonmarkerlist)))
 truedist = log10(as.numeric(unlist(markerlists$markerlist)))
-specificity_threshold <- quantile(nulldist, probs = 1-0.01, na.rm = TRUE)
+specificity_threshold <- quantile(nulldist, probs = 0.99, na.rm = TRUE)
 
 wbmat <- data.frame()
 markerlist <- markerlists$markerlist
@@ -196,16 +197,9 @@ wbmat <- rbind(wbmat, currmatforwbmat)
 }
 wbmat[["V1"]] <- NULL 
 set1 <- wbmat[wbmat$edgeR_logFC < -1 & wbmat$edgeR_logCPM > 1]
-CRE_split <- do.call(rbind, strsplit(as.character(set1$CRE), "_"))
-set1_gr <- GRanges(
-  seqnames = CRE_split[,1],
-  ranges = IRanges(start = as.numeric(CRE_split[,2]), end = as.numeric(CRE_split[,3])),
-  strand = "*",
-  set1
-)
-set1_gr_anno <- fastAnnoPeaks(peaks=set1_gr)
 
 #Filter wilcoxon test form ArchRProj
+set.seed(1)
 markersPeaks <- getMarkerFeatures(
     ArchRProj = proj, 
     useMatrix = "PeakMatrix", 
@@ -213,11 +207,11 @@ markersPeaks <- getMarkerFeatures(
     bias = c("TSSEnrichment", "log10(nFrags)"),
     testMethod = "wilcoxon"
 )
-markersArchR <- getMarkers(markersPeaks)
+markersArchR <- getMarkers(markersPeaks, cutOff = "FDR <= 0.01 & Log2FC >= 1")
 names(markersArchR) <- gsub(" ", "-", names(markersArchR))
 
-set1_final_anno <- GRanges()
-for (ct in intersect(names(markersArchR), unique(set1_gr_anno$celltype))) {
+set1_final <- GRanges()
+for (ct in intersect(names(markersArchR), unique(set1$celltype))) {
   df_archr <- as.data.frame(markersArchR[[ct]])
   if (nrow(df_archr) == 0) next
   gr_archr <- GRanges(seqnames = df_archr$seqnames, ranges = IRanges(df_archr$start, df_archr$end))
@@ -225,10 +219,12 @@ for (ct in intersect(names(markersArchR), unique(set1_gr_anno$celltype))) {
   overlap <- subsetByOverlaps(gr_custom, gr_archr, minoverlap = 1)
   if (length(overlap) > 0) {
     overlap$source <- "Both"
-    set1_final_anno <- c(set1_final_anno, overlap)
+    set1_final <- c(set1_final, overlap)
     cat(ct, ":", length(overlap), "common peaks\n")
   }
 }
 
-write.table(set1_final_anno, "set1_celltype_specificity_anno.txt", row.names=F, quote=F, sep="\t")
-saveRDS(set1_final_anno, "set1_celltype_specificity_anno.rds")
+set1_anno <- fastAnnoPeaks(peaks=set1_final)
+
+write.table(set1_anno, "set1_celltype_specificity_anno.txt", row.names=F, quote=F, sep="\t")
+saveRDS(set1_anno, "set1_celltype_specificity_anno.rds")

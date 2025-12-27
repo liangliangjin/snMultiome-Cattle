@@ -139,7 +139,7 @@ proj$Clusters3 <- ifelse(grepl("2", proj$Sample), "Mongolian", "Leiqiong")
 proj$tissue <- gsub("[0-9]", "", proj$Sample)
 #proj$tissue <- gsub("fat", "Adipose", proj$tissue)
 
-##RNA-LSI
+##RNA-PCA
 ##!Due to the limitations of LSI, RNA dimensionality reduction was changed to be conducted in Seurat.
 ##After ArchR2Seurat (see Data_format_conversion.R)
 DefaultAssay(SeuratObject) <- "RNA"
@@ -184,5 +184,16 @@ proj@embeddings$UMAP_wnn <- SimpleList(df = seurat.umap.df, params = list())
 wnn_clusters <- SeuratObject$seurat_clusters
 wnn_clusters <- wnn_clusters[proj$cellNames]
 proj$WNN_Clusters <- wnn_clusters
+
+
+proj <- addClusters(proj, reducedDims = "Harmony_ATAC", method = "Seurat", name = "Clusters_ATAC", resolution =set_resolution, maxClusters = NULL,force = TRUE)
+proj <- addClusters(proj, reducedDims = "harmony_rna", method = "Seurat", name = "Clusters_RNA", resolution =set_resolution, maxClusters = NULL,force = TRUE)
+proj <- addUMAP(ArchRProj = proj, reducedDims = "Harmony_ATAC", name = "UMAP_ATAC", force = TRUE)
+proj <- addUMAP(ArchRProj = proj, reducedDims = "harmony_rna", name = "UMAP_RNA", force = TRUE)
+##############
+p_rna <- plotEmbedding(proj, name = "Clusters_RNA", embedding = "UMAP_RNA", labelAsFactors=F,plotAs="points", labelMeans=F, rastr = FALSE)
+p_rna + theme(legend.position = "none")
+p_ATAC <- plotEmbedding(proj, name = "Clusters_ATAC", embedding = "UMAP_ATAC", labelAsFactors=F,plotAs="points", labelMeans=F, rastr = FALSE)
+p_ATAC + theme(legend.position = "none")
 
 saveRDS(proj, file = "combine_all_after_filter.rds")

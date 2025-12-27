@@ -15,7 +15,7 @@ seqlevels(annotations) <- paste0('chr', seqlevels(annotations))
 pkm <- getPeakMatrix(proj)
 
 #annotations<-readRDS("~/SC/annotations_ARS.rds")
-fragments_dirs <- as.list(paste0("/home/Jingliangliang/SC/",unique(proj@cellColData$Sample),"/outs/"))
+fragments_dirs <- as.list(paste0("~/SC/",unique(proj@cellColData$Sample),"/outs/"))
 SeuratObject <- ArchR2Signac(
   ArchRProject = proj,
   refversion = "bosTau9",

@@ -9,11 +9,11 @@ for temp_celltype in celltype_list:
     if os.path.exists('./Peak_df/DA_CRE/Res/'+temp_celltype+'_leiqiong.txt'):
         cattle_df = pd.read_csv('./Peak_df/DA_CRE/Res/'+temp_celltype+'_leiqiong.txt', sep='\t')
         cattle_df = cattle_df.loc[cattle_df['padj'] < 0.01,]
-        cattle_df = cattle_df.loc[cattle_df['logFC']< 0,]
+        cattle_df = cattle_df.loc[cattle_df['logFC']< -1,]
         if os.path.exists('./Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt'):
             Cross_df = pd.read_csv('./Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt', sep='\t')
             Cross_df = Cross_df.loc[Cross_df['padj']< 0.01,]
-            Cross_df = Cross_df.loc[Cross_df['logFC']< 0,]
+            Cross_df = Cross_df.loc[Cross_df['logFC']< -1,]
             print(temp_celltype, cattle_df.shape, Cross_df.shape)
             Used_peak = np.intersect1d(cattle_df.index, Cross_df.index)
             Used_df = cattle_df.loc[Used_peak, ]
@@ -31,11 +31,11 @@ for temp_celltype in celltype_list:
     if os.path.exists('./Peak_df/DA_CRE/Res/'+temp_celltype+'_mongolian.txt'):
         cattle_df = pd.read_csv('/home/Jingliangliang/SC/Peak_df/DA_CRE/Res/'+temp_celltype+'_mongolian.txt', sep='\t')
         cattle_df = cattle_df.loc[cattle_df['padj'] < 0.01,]
-        cattle_df = cattle_df.loc[cattle_df['logFC'] < 0,]
+        cattle_df = cattle_df.loc[cattle_df['logFC'] < -1,]
         if os.path.exists('./Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt'):
             Cross_df = pd.read_csv('./Peak_df/DA_CRE/Res/'+temp_celltype+'_Cross_IvsT.txt', sep='\t')
             Cross_df = Cross_df.loc[Cross_df['padj'] < 0.01,]
-            Cross_df = Cross_df.loc[Cross_df['logFC'] > 0,]
+            Cross_df = Cross_df.loc[Cross_df['logFC'] > 1,]
             print(temp_celltype, cattle_df.shape, Cross_df.shape)
             Used_peak = np.intersect1d(cattle_df.index, Cross_df.index)
             Used_df = cattle_df.loc[Used_peak, ]
