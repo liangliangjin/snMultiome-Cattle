@@ -252,3 +252,19 @@ diff_test <- differentialGeneTest(cds,
 saveRDS(diff_test, file = file.path(outdir, paste0("diff_test_cluster_", cluster_idx, ".rds")))
 message("Finished cluster: ", cluster_name)
 #Script run_monocle_glm.R ends.
+
+
+
+#Filter binomialff test
+rds_files <- list.files(path = "./results", pattern = "^diff_test_cluster_\\d+\\.rds$", full.names = TRUE)
+daps_list <- map(rds_files, function(f) {
+  df <- readRDS(f)
+  if ("qval" %in% colnames(df)) {
+    df[df$qval < 0.01, , drop = FALSE]
+  } else {
+    data.frame()
+  }
+})
+names(daps_list) <- gsub("^.*diff_test_cluster_|\\.rds$", "", rds_files)
+daps_list <- daps_list[order(as.numeric(names(daps_list)))]
+names(daps_list) <- gsub(" ", "-", unique(meta$main)[as.numeric(names(daps_list))])

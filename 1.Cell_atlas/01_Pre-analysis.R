@@ -161,7 +161,7 @@ if(all(rownames(LSI_ATAC) %in% colnames(SeuratObject))){
 SeuratObject <- FindMultiModalNeighbors(SeuratObject, reduction.list = list("harmony_rna", "harmony_atac"), dims.list = list(1:30, 2:30))
 SeuratObject <- RunUMAP(SeuratObject, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
 SeuratObject <- FindClusters(SeuratObject, graph.name = "wsnn", algorithm = 3, verbose = FALSE)
-#Add the Suerat data to the Archr project
+#Add the Seurat data to the Archr project
 #reduction
 harmony_rna_mat <- Embeddings(SeuratObject, reduction = "harmony_rna")[, 1:30]
 harmony_rna_mat <- harmony_rna_mat[proj$cellNames, ]

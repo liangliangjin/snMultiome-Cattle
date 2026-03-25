@@ -44,6 +44,23 @@ for (temp_celltype in celltype_list){
 }
 
 
+# Set1: Celltype-specific CRE
+#Filter edgeR test files
+library(data.table)
+library(purrr)
+meta <- readRDS("meta.rds")
+
+file_list <- list.files("./Peak_df/DA_CRE_Onlycelltypes/Res", pattern = "\\.txt$", full.names = TRUE)
+edgeR_list <- map(file_list, function(file) {
+  data <- fread(file)
+  setnames(data, 1, "CRE")
+  data[padj < 0.01 & logFC < 1]
+})
+names(edgeR_list) <- gsub("\\.txt$", "", basename(file_list))
+
+
+
+
 
 ###########
 #EdgeR process for Leiqiong and mongolian cattle

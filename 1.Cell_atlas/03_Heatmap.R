@@ -1,6 +1,7 @@
 #
 library(Seurat)
 library(ArchR)
+library(Signac)
 library(BSgenome.Btaurus.UCSC.bosTau9)
 library(TxDb.Btaurus.UCSC.bosTau9.refGene)
 library(org.Bt.eg.db)
@@ -11,11 +12,114 @@ proj <- readRDS("all_sample.rds")
 proj <- readRDS("all_sample.rds")
 proj <- addPeak2GeneLinks(ArchRProj = proj, reducedDims = "Harmony", useMatrix = "GeneExpressionMatrix")
 p <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "main")
-#
 
-#Enrichment
+
+SeuratObject <- readRDS("SeuratObject_wnn.rds")
+DefaultAssay(SeuratObject) <- "peaks"
+linkedpeaks <- list()
+SeuratObject <- RegionStats(SeuratObject, BSgenome.Btaurus.UCSC.bosTau9)
+Idents(SeuratObject) <- "main"
+for(i in levels(SeuratObject)){
+  celltype <- subset(SeuratObject, idents = i)
+  celltype <- LinkPeaks(celltype, 
+                        peak.assay = "peaks", 
+                        expression.assay = "RNA", 
+                        distance = 500000)
+  linkedpeaks[[i]] <- celltype@assays[["peaks"]]@links
+}
+saveRDS(linkedpeaks, "linkpeaks.rds")
+
+link_stats <- data.frame(
+  celltype = names(linkedpeaks),
+  n_links = sapply(linkedpeaks, nrow)
+)
+
+ggplot(link_stats, aes(x = celltype, y = n_links)) +
+  geom_col() +
+  theme_classic() +
+  coord_flip()
+
+
+#corplot
+DefaultAssay(SeuratObject) <- "SCT"
+rna.avg <- AverageExpression(
+    SeuratObject,
+    assays = "SCT",
+    features = VariableFeatures(SeuratObject),
+	group.by = "main"
+)
+celltypes <- unique(colnames(rna.avg$RNA))
+corM <- cor(as.matrix(rna.avg$SCT), method = "pearson")
+ordered_indices <- corrplot::corrMatOrder(
+	corM[celltypes, celltypes],
+	order = "hclust",
+	hclust.method = "ward.D2"
+	)
+ordered_celltypes <- celltypes[ordered_indices]
+pdf("RNA.correaltion.pdf", width = 9, height = 9)
+corrplot(
+    corM[ordered_celltypes, ordered_celltypes],
+    method = "square",
+    type = "upper",
+    tl.col = "black",
+    tl.cex = 0.6,
+    is.corr = F,
+    col = rev(COL2("RdBu", 100)),
+    order = "original",col.lim = c(-1, 1)
+)
+dev.off()
+#
+DefaultAssay(SeuratObject) <- "peaks"
+SeuratObject <- RunTFIDF(SeuratObject)
+SeuratObject <- FindTopFeatures(SeuratObject, min.cutoff = "q0")
+SeuratObject <- RunSVD(SeuratObject)
+SeuratObject.atac.markers <-
+    parallel::mclapply(unique(SeuratObject$main), function(x) {
+        xx <- FindMarkers(
+            SeuratObject,
+            ident.1 = x,
+            only.pos = T,
+            test.use = "LR",
+            max.cells.per.ident = 300,
+            latent.vars = "nCount_peaks"
+        )
+        return(data.frame(xx, gene = rownames(xx), cluster = x))
+    }, mc.cores = 20)
+peaks <- lapply(SeuratObject.atac.markers, function(x) {
+    if (!is.null(nrow(x))) {
+            return(x)
+        }
+    })
+peaksID <- do.call(rbind, peaks) %>%
+    group_by(cluster) %>%
+	filter(p_val_adj < 0.001) %>%
+    top_n(500, avg_log2FC) %>%
+    pull(gene) %>%
+    unique()
+
+SeuratObject.atac.avg <- AverageExpression(SeuratObject,
+    assays = "peaks",
+    features = peaksID,
+	slot = "data",
+	group.by = "main"
+)
+corATAC <- cor(as.matrix(SeuratObject.atac.avg$peaks), method = "pearson")
+pdf("ATAC.correaltion.pdf", width = 9, height = 9)
+corrplot(
+    corATAC[ordered_celltypes, ordered_celltypes],
+    method = "square",
+    type = "lower",
+    tl.col = "black",
+    tl.cex = 0.6,
+    is.corr = F,
+    col = rev(COL2("RdBu", 100)),
+    order = "original", col.lim = c(-1, 1)
+)
+dev.off()
+	
+#GO enrichment
 #Cell types that do not belong to this group are used as the background
-proj$Clusters_GO<-as.character(sapply(proj$main, function(x) strsplit(x, "-")[[1]][1]))
+proj$Clusters_GO <- as.character(sapply(proj$main, function(x) strsplit(x, "-")[[1]][1]))
 for (i in unique(proj$main)){
 print(paste0("start ",i,":"));
 bg<-unique(proj$main[!proj$Clusters_GO==unique(proj$Clusters_GO[which(proj$main==i)])])
@@ -41,8 +145,8 @@ else{print("error")}
 rm(list=c("bg","markers","a","gene"))
 }
 #Annotate using the clusterProfiler package
-library(AnnotationHub)
 library(clusterProfiler)
+library(AnnotationHub)
 library(stringr)
 library(msigdbr)
 library(org.Bt.eg.db)

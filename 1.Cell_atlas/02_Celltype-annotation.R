@@ -1,41 +1,86 @@
 library(Seurat)
+library(dplyr)
 library(ArchR)
 addArchRThreads(threads = 16)
 
+SeuratObject <- readRDS("SeuratObject_wnn.rds")
 proj <- readRDS("combine_all_after_filter.rds")
-
 proj <- addImputeWeights(proj, reducedDims = "Harmony")
 
 dir.create("./0.marker/WNN_Clusters", showWarnings = FALSE)
-proj$WNN_Clusters[proj$WNN_Clusters %in% names(table(proj$WNN_Clusters)[table(proj$WNN_Clusters) < 10])] <- "Unknown cells"
-markersGS <- getMarkerFeatures(
-	ArchRProj = proj,
-	useMatrix = "GeneExpressionMatrix",
-	groupBy = "WNN_Clusters",
-	bias = c("TSSEnrichment","log10(Gex_nUMI)"),
-	testMethod = "wilcoxon"
+
+markers_all <- FindAllMarkers(
+  object = SeuratObject,
+  group.by = "WNN_Clusters",
+  assay = "SCT",
+  layer = "data",
+  only.pos = TRUE,
+  test.use = "wilcox",
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
 )
-markerList <- getMarkers(markersGS, cutOff = "FDR < 0.05 & Log2FC > 1")
-for(c in 1:length(unique(proj$WNN_Clusters))){
-write.table(markerList@listData[[c]],paste0(getwd(), "/0.marker/WNN_Clusters/combine_all_",names(markerList[c]),".txt"),col.names=T,row.names=T,sep="\t");
+markers_significant <- markers_all %>% filter(p_val_adj < 0.01 & avg_log2FC > 0.5) %>% 
+  mutate(
+    cluster = as.numeric(as.character(cluster)),
+    gene = as.character(gene)
+  ) %>% arrange(cluster, desc(avg_log2FC))
+write.table(markers_significant, "markers_significant.txt", quote=F, row.names = F, sep = "\t")
+
+# All clusters of marker genes were examined and annotated manually in conjunction with the literature
+Annotation <- read.table("Annotation_result.txt", header = T, sep = "\t")
+
+# Use large language models (LLM, From clusterProfiler::interpret) to analyze enrichment results for cross-validation of manual annotations.
+library(clusterProfiler)
+library(org.Bt.eg.db)
+
+enrich_results <- list()
+for(cl in unique(markers_significant$cluster)) {
+	message(cl)
+	enrich_results[[as.character(cl)]] <- NULL
+	markers <- markers_significant %>% 
+		filter(cluster == cl) %>% arrange(desc(avg_log2FC))
+	geneList <- markers$avg_log2FC
+	names(geneList) <- markers$gene
+	geneList <- sort(geneList, decreasing = TRUE)
+	if(length(geneList) >= 5){
+		eG <- gseGO(gene = geneList,
+			keyType = 'SYMBOL',
+			OrgDb = org.Bt.eg.db,
+			ont = "BP", pvalueCutoff = 0.05,
+			pAdjustMethod = "BH")
+		if(!is.null(eG) && nrow(eG) > 0) {
+		  enrich_results[[as.character(cl)]] <- eG
+		}
+	}
 }
+saveRDS(enrich_results, file = "enrich_results.rds")
 
-################All clusters of marker genes were examined and annotated manually in conjunction with the literature
-
-################Star genes can also be visualized on UMAP
-plotEmbedding(
-  ArchRProj = proj,
-  colorBy = "GeneExpressionMatrix",#GeneScoreMatrix GeneExpressionMatrix
-  name = "GAD1",
-  embedding = "UMAP_wnn",
-  quantCut = c(0.01, 0.95),rastr = FALSE,
-  imputeWeights = getImputeWeights(proj)
-)
-
+#Obtain the API and key, see https://github.com/YuLab-SMU/fanyi
+#set_translate_option(appid = '', key = '', source = "dsk")
+res <- list()
+for (cl in names(enrich_results)) {
+  tryCatch({
+	ssample <- table(SeuratObject$Clusters4[SeuratObject$WNN_Clusters==cl]) %>% prop.table %>% `*`(100) %>% .[. > 5] %>% sort(decreasing = TRUE)
+	tissue_string <- paste0(names(ssample), "(", round(ssample, 0), "%)", collapse = "; ")
+	top50genes <- paste(head(markers_significant$gene[markers_significant$cluster == cl], 50), collapse = ", ")
+    interp_result <- interpret(
+      enrich_results[[cl]],
+	  context = paste0("Multi-tissue single-cell sequencing of cattle, and the main tissue sources are as follows: ", tissue_string, " the top highly variable genes are as follows: ", top50genes),
+      prior = Annotation$annotation[Annotation$celltype==cl],
+      model = "deepseek-chat",
+      task = "cell_type"
+    )
+    res[[cl]] <- interp_result
+  }, error = function(e) {
+    message("Error in cluster ", cl, ": ", e$message)
+    res[[cl]] <- list(error = e$message)
+  })
+  message(paste0(cl, ": The cell type manually annotated as [",Annotation$annotation[Annotation$celltype==cl],"] is inferred to be [", res[[cl]]$cell_type, "] with a confidence level of [", res[[cl]]$confidence, "]."))
+}
 
 #Rename celltypes
 labelOld <- as.character(unique(proj$WNN_Clusters))
-Annotation <- read.table("Annotation_result.txt", header = T, sep = "\t")
+Annotation <- read.table("Annotation_result_final.txt", header = T, sep = "\t") #Adjusted annotations
 mapping <- setNames(as.character(Annotation$annotation), as.character(Annotation$celltype))
 labelNew <- ifelse(!is.na(mapping[labelOld]), mapping[labelOld], "Unknown cells")
 proj$main <- mapLabels(proj$WNN_Clusters, newLabels = labelNew, oldLabels = labelOld)

@@ -1,4 +1,4 @@
-########################ArchR to Signac Format
+########################ArchR to Seurat/Signac Format
 library(ArchR)
 library(Seurat)
 library(SingleCellExperiment)
@@ -34,8 +34,8 @@ getRNAMatrix <- function(
 ){
   print("In Progress:")
   print("Get RNA Matrix From ArchRProject")
-  GeneScore_matrix <- ArchR::getMatrixFromProject(ArchRProject, useMatrix='GeneExpressionMatrix')
-  gsm <- assays(GeneScore_matrix)$GeneExpressionMatrix # peaks sparse martix
+  GeneExpression_matrix <- ArchR::getMatrixFromProject(ArchRProject, useMatrix='GeneExpressionMatrix')
+  gem <- assays(GeneExpression_matrix)$GeneExpressionMatrix # peaks sparse martix
   print("get Gene Features From ArchRProject")
   GeneFeatures <-getFeatures(
     ArchRProj = ArchRProject,
@@ -43,16 +43,16 @@ getRNAMatrix <- function(
     select = NULL,
     ignoreCase = TRUE
   )
-  colnames(gsm) <- gsub("#", "_", colnames(gsm))
-  ix <- match(colnames(SeuratObject), colnames(gsm))
-  gsm <- gsm[,ix]
+  colnames(gem) <- gsub("#", "_", colnames(gem))
+  ix <- match(colnames(SeuratObject), colnames(gem))
+  gem <- gem[,ix]
   print("Saving Gene Features From ArchRProject into Gene Score Matrix")
-  rownames(gsm) <- GeneFeatures
+  rownames(gem) <- GeneFeatures
   print("Return RNA Matrix")
-  gsm
+  gem
 }
-gsm <- getRNAMatrix(ArchRProject = proj, SeuratObject = SeuratObject)
-SeuratObject[['RNA']] <- CreateAssayObject(counts = gsm)
+gem <- getRNAMatrix(ArchRProject = proj, SeuratObject = SeuratObject)
+SeuratObject[['RNA']] <- CreateAssayObject(counts = gem)
 SeuratObject <- addTwoDimRed(
   ArchRProject = proj,
   SeuratObject = SeuratObject,
