@@ -1,6 +1,11 @@
+#Load packages
+suppressPackageStartupMessages({
 library(Seurat)
 library(dplyr)
 library(ArchR)
+library(clusterProfiler)
+library(org.Bt.eg.db)
+})
 addArchRThreads(threads = 16)
 
 SeuratObject <- readRDS("SeuratObject_wnn.rds")
@@ -30,9 +35,6 @@ write.table(markers_significant, "markers_significant.txt", quote=F, row.names =
 Annotation <- read.table("Annotation_result.txt", header = T, sep = "\t")
 
 # Use large language models (LLM, From clusterProfiler::interpret) to analyze enrichment results for cross-validation of manual annotations.
-library(clusterProfiler)
-library(org.Bt.eg.db)
-
 enrich_results <- list()
 for(cl in unique(markers_significant$cluster)) {
 	message(cl)

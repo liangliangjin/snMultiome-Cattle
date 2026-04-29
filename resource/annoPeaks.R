@@ -1,9 +1,10 @@
 #Referring to the annotation function of ArchR, more peaktypes have been added.
-library(ArchR)
 library(GenomicFeatures)
 library(GenomicRanges)
 library(BSgenome.Btaurus.UCSC.bosTau9)
 library(org.Bt.eg.db)
+library(ArchR)
+addArchRThreads(threads = 16)
 genomeAnnotation <- createGenomeAnnotation(genome = BSgenome.Btaurus.UCSC.bosTau9)
 txdb <- makeTxDbFromGFF("ARS-UCD1.2.110.chr.gtf", format = "gtf") # Or replace it with the GTF file of another species/version.
 geneAnnotation <- createGeneAnnotation(TxDb = txdb, OrgDb = org.Bt.eg.db)

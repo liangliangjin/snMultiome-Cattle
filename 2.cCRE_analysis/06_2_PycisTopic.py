@@ -76,7 +76,7 @@ fragments_dict = fragments_df['inputFiles'].to_dict()
 
 cell_data = pd.read_table("cell_metadata.tsv", index_col = 0)
 cell_data['barcode'] = cell_data.index.str.split('#').str[1]
-cell_data.index = cell_data['barcode'] + '-' + cell_data['Sample']
+cell_data.index = cell_data['barcode'] + '-' + cell_data['sample']
 cell_data.head()
 
 chromsizes = pd.read_table("ARSUCD1.2.chr.sizes", header = None, names = ["Chromosome", "End"])
@@ -91,7 +91,7 @@ os.makedirs(os.path.join(out_dir, "consensus_peak_calling/pseudobulk_bw_files"),
 bw_paths, bed_paths = export_pseudobulk(
    input_data = cell_data,
    variable = "main",
-   sample_id_col = "Sample",
+   sample_id_col = "sample",
    chromsizes = chromsizes,
    bed_path = os.path.join(out_dir, "consensus_peak_calling/pseudobulk_bed_files"),
    bigwig_path = os.path.join(out_dir, "consensus_peak_calling/pseudobulk_bw_files"),

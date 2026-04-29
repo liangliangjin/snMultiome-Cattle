@@ -1,7 +1,9 @@
 # confusionMatrix
+#Load packages
+suppressPackageStartupMessages({
 library(pheatmap)
 library(RColorBrewer)
-
+})
 cM_wnn_rna <- confusionMatrix(paste0(proj$Clusters_RNA), paste0(proj$WNN_Clusters))
 cM_wnn_rna <- as.matrix(cM_wnn_rna / Matrix::rowSums(cM_wnn_rna))
 cM_wnn_rna <- cM_wnn_rna[match(sort(rownames(cM_wnn_rna)),rownames(cM_wnn_rna)),]

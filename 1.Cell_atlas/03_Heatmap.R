@@ -1,43 +1,111 @@
-#
+#Load packages
+suppressPackageStartupMessages({
 library(Seurat)
 library(ArchR)
 library(Signac)
 library(BSgenome.Btaurus.UCSC.bosTau9)
 library(TxDb.Btaurus.UCSC.bosTau9.refGene)
 library(org.Bt.eg.db)
+library(clusterProfiler)
+library(AnnotationHub)
+library(stringr)
+library(msigdbr)
+library(org.Bt.eg.db)
+library(KEGG.db)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(stringdist)
+library(viridis)
+library(patchwork)
+})
 #
 proj <- readRDS("all_sample.rds")
 
 ##Fig2.Peak2gene
 proj <- readRDS("all_sample.rds")
-proj <- addPeak2GeneLinks(ArchRProj = proj, reducedDims = "Harmony", useMatrix = "GeneExpressionMatrix")
-p <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "main")
+# Add Iterative LSI
+proj <- addIterativeLSI(ArchRProj = proj, useMatrix = "PeakMatrix", name = "IterativeLSI_Peak")
 
+proj <- addHarmony(ArchRProj = proj, reducedDims = "IterativeLSI_Peak", name = "Harmony_Peak", groupBy = c("Clusters3", "Sample"), force = TRUE)
 
-SeuratObject <- readRDS("SeuratObject_wnn.rds")
-DefaultAssay(SeuratObject) <- "peaks"
-linkedpeaks <- list()
-SeuratObject <- RegionStats(SeuratObject, BSgenome.Btaurus.UCSC.bosTau9)
-Idents(SeuratObject) <- "main"
-for(i in levels(SeuratObject)){
-  celltype <- subset(SeuratObject, idents = i)
-  celltype <- LinkPeaks(celltype, 
-                        peak.assay = "peaks", 
-                        expression.assay = "RNA", 
-                        distance = 500000)
-  linkedpeaks[[i]] <- celltype@assays[["peaks"]]@links
-}
-saveRDS(linkedpeaks, "linkpeaks.rds")
-
-link_stats <- data.frame(
-  celltype = names(linkedpeaks),
-  n_links = sapply(linkedpeaks, nrow)
+proj <- addUMAP(
+  ArchRProj = proj,
+  reducedDims = "IterativeLSI_Peak",
+  name = "UMAP_Peak",
+  nNeighbors = 30,
+  minDist = 0.5,
+  metric = "cosine",
+  force = TRUE
 )
 
-ggplot(link_stats, aes(x = celltype, y = n_links)) +
-  geom_col() +
-  theme_classic() +
-  coord_flip()
+
+# Calculate coaccessibility
+proj <- addCoAccessibility(
+  ArchRProj = proj,
+  reducedDims = "IterativeLSI_Peak"
+)
+
+saveArchRProject(proj)
+
+proj <- addPeak2GeneLinks(
+  ArchRProj = proj,
+  useMatrix = "GeneExpressionMatrix",
+  reducedDims = "IterativeLSI_Peak",
+  k = 200
+)
+
+
+plotEmbedding(
+  ArchRProj = proj,
+  colorBy = "Clusters3",
+  name = "main",
+  embedding = "UMAP_Peak"
+)
+p_cattle <- plotEmbedding(proj, name = "Clusters3",embedding ="Harmony_Peak",labelAsFactors=F,labelMeans=F,legendSize=5,rastr = FALSE)
+
+proj <- addPeak2GeneLinks(ArchRProj = proj, reducedDims = "Harmony_ATAC", useMatrix = "GeneExpressionMatrix")
+p <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "main")
+
+p2gtmp <- metadata(proj@peakSet)$Peak2GeneLinks
+
+rna_genes <- metadata(p2gtmp)$geneSet
+atac_genes <- getGenes()
+genespf <- which(rna_genes$name %in% atac_genes$symbol)
+p2gpf <- p2gtmp[p2gtmp$idxRNA %in% genespf,]
+metadata(proj@peakSet)$Peak2GeneLinks <- p2gpf
+
+
+# add some annotation columns for plotting
+annot.list <- list()
+for (i in seq_along(toKeep$code)){
+  organ <- toKeep$code[i]
+  meta <- readr::read_tsv(paste0(meta.dir, "/", organ, "_meta.txt"))
+  df <- data.frame(CellNames=meta$cb, RNA_Clusters=paste0(organ, "_", meta$L1_clusterID), 
+                   RNA_NamedCluster_L2=paste0(organ, "_", meta$L1_clusterID, "_", meta$L2_clusterName))
+  annot.list[[organ]] <- df
+}
+annot <- bind_rows(annot.list)
+
+# Add RNA_Clusters to the all sample project
+proj <- addCellColData(
+  ArchRProj = proj,
+  name = "RNA_NamedCluster_L2",
+  cells = annot$CellNames,
+  data = paste0(annot$RNA_NamedCluster_L2),
+  force = TRUE
+)
+
+proj$organ_code <- lapply(proj$RNA_Clusters, function(n){strsplit(n, split="_")[[1]][1]}) %>% unlist 
+
+# plot peak 2 gene
+p1 <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "RNA_Clusters", k=10, seed=1)
+p2 <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "RNA_Clusters", k=20, seed=1)
+p3 <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "RNA_NamedCluster_L2", k=10, seed=1)
+p4 <- plotPeak2GeneHeatmap(ArchRProj = proj, groupBy = "organ_code", k=10, seed=1)
+
+
 
 
 #corplot
@@ -145,19 +213,6 @@ else{print("error")}
 rm(list=c("bg","markers","a","gene"))
 }
 #Annotate using the clusterProfiler package
-library(clusterProfiler)
-library(AnnotationHub)
-library(stringr)
-library(msigdbr)
-library(org.Bt.eg.db)
-library(KEGG.db)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(tibble)
-library(stringdist)
-library(viridis)
-library(patchwork)
 files<-list.files("./marker/", pattern = "txt", full.names = TRUE)
 for(i in files){
 geneid<-read.table(file=i, header=T, sep="\t")

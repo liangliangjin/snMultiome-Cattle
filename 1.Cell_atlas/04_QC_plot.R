@@ -1,7 +1,14 @@
 #Figure S1b tissue origin
+#Load packages
+suppressPackageStartupMessages({
 library(ggplot2)
 library(tidyr)
-
+library(patchwork)
+library(Seurat)
+library(ggplot2)
+library(patchwork)
+library(Matrix)
+})
 #celltype <- strsplit(as.character(proj@cellColData$main), "-")
 #cellgroup <- sapply(celltype, function(x) x[1])
 #addCellColData(proj, data = cellgroup, name = "Clusters_GO", cells = getCellNames(proj))
@@ -65,7 +72,6 @@ ggplot(df_counts, aes(x = proportion, y = Clusters_GO, fill = Clusters3)) +
 
 
 # Figure S1d
-library(patchwork)
 metadata <- getCellColData(
     proj,
     select = c("Sample", "Gex_nUMI", "Gex_nGenes", "nFrags")
@@ -121,10 +127,6 @@ p_frag <- plotFragmentSizes(ArchRProj = proj, groupBy = "Sample")
 
 # Figure S1g
 # load SeuratObject
-library(Seurat)
-library(ggplot2)
-library(patchwork)
-library(Matrix)
 SeuratObject <- readRDS("SeuratObject_wnn.rds")
 meta <- SeuratObject@meta.data
 rna <- GetAssayData(SeuratObject, "RNA", "counts")
@@ -261,10 +263,6 @@ pG2M <- ggplot(combined_meta, aes(x = Phase, y = G2M.Score, fill = Phase)) +
 
 # Figure S1i
 # load SeuratObject
-library(Seurat)
-library(ggplot2)
-library(patchwork)
-library(Matrix)
 SeuratObject <- readRDS("SeuratObject_wnn.rds")
 meta <- SeuratObject@meta.data
 rna <- GetAssayData(SeuratObject, "RNA", "data")

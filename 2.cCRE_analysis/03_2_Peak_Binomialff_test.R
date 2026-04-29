@@ -41,7 +41,6 @@ cluster_idx <- opt$cluster_index
 cells_per_sample <- opt$cells_per_sample
 cores <- opt$cores
 outdir <- opt$outdir
-
 #Reading data
 #proj <- readRDS("proj.rds") #ArchR proj
 datafr <- readRDS("datafr.rds") #CRE x Cell
@@ -69,9 +68,16 @@ sample_cells <- c(cells_in_cluster, ref_cells)
 submat <- (datafr[, sample_cells] > 0) * 1
 submeta <- meta[sample_cells, , drop=FALSE]
 
-pda <- data.frame(CellID = sample_cells,
-	ReadDepth = submeta$nFrags,
-	CellCluster = factor(ifelse(submeta$main == cluster_name, cluster_name, "Reference")))
+pda <- data.frame(
+  CellID = sample_cells,
+  TSSEnrichment = submeta$TSSEnrichment,
+  log10nFrags = log10(submeta$nFrags),
+  CellCluster = factor(
+    ifelse(submeta$main == cluster_name, cluster_name, "Reference"),
+    levels = c("Reference", cluster_name)
+  )
+)
+
 rownames(pda) <- pda$CellID
 pda <- new("AnnotatedDataFrame", data = pda)
 
@@ -79,11 +85,18 @@ fda <- data.frame(Peak = rownames(submat))
 rownames(fda) <- fda$Peak
 fda <- new("AnnotatedDataFrame", data = fda)
 
-cds <- newCellDataSet(submat,
-                      featureData = fda,
-                      phenoData = pda,
-                      expressionFamily = binomialff(),
-                      lowerDetectionLimit = 1)
+cds <- newCellDataSet(
+  submat,
+  featureData = fda,
+  phenoData = pda,
+  expressionFamily = binomialff(),
+  lowerDetectionLimit = 1
+)
+
+if (any(!is.finite(pData(cds)$TSSEnrichment)) || any(!is.finite(pData(cds)$log10nFrags))) {
+  stop("Non-finite values found in TSSEnrichment or log10nFrags.")
+}
+
 pData(cds)$Size_Factor <- 1
 cds@expressionFamily@vfamily <- "binomialff"
 message("cds finished......")
@@ -244,27 +257,13 @@ differentialGeneTest <- function(cds,
 }
 
 
-diff_test <- differentialGeneTest(cds,
-                                  fullModelFormulaStr = "~CellCluster + ReadDepth",
-                                  reducedModelFormulaStr = "~ReadDepth",
-                                  cores = cores-1)
+diff_test <- differentialGeneTest(
+  cds,
+  fullModelFormulaStr = "~CellCluster + TSSEnrichment + log10nFrags",
+  reducedModelFormulaStr = "~TSSEnrichment + log10nFrags",
+  cores = cores - 1
+)
 
 saveRDS(diff_test, file = file.path(outdir, paste0("diff_test_cluster_", cluster_idx, ".rds")))
 message("Finished cluster: ", cluster_name)
 #Script run_monocle_glm.R ends.
-
-
-
-#Filter binomialff test
-rds_files <- list.files(path = "./results", pattern = "^diff_test_cluster_\\d+\\.rds$", full.names = TRUE)
-daps_list <- map(rds_files, function(f) {
-  df <- readRDS(f)
-  if ("qval" %in% colnames(df)) {
-    df[df$qval < 0.01, , drop = FALSE]
-  } else {
-    data.frame()
-  }
-})
-names(daps_list) <- gsub("^.*diff_test_cluster_|\\.rds$", "", rds_files)
-daps_list <- daps_list[order(as.numeric(names(daps_list)))]
-names(daps_list) <- gsub(" ", "-", unique(meta$main)[as.numeric(names(daps_list))])

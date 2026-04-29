@@ -1,7 +1,15 @@
+#Load packages
+suppressPackageStartupMessages({
 library(ArchR)
+library(Seurat)
 library(BSgenome.Btaurus.UCSC.bosTau9)
 library(TxDb.Btaurus.UCSC.bosTau9.refGene)
 library(org.Bt.eg.db)
+library(readr)
+library(dplyr)
+library(GenomicRanges)
+library(rtracklayer)
+})
 addArchRThreads(threads = 16)
 
 
@@ -15,8 +23,11 @@ pathToMacs2 <- findMacs2()
 proj <- addGroupCoverages(ArchRProj = proj, maxCells =2000, groupBy = "celltype_cattle",force = TRUE)
 #Iterative overlapping peak, faCount your.fa
 proj <- addReproduciblePeakSet(ArchRProj = proj, groupBy = "celltype_cattle", pathToMacs2 = pathToMacs2, genomeSize = 2.7e+09, cutOff = 0.05, force = TRUE)
+peakSet <- getPeakSet(proj)
+blacklist <- import("ARSUCD1.2_blacklist.bed")
+peakSet_filter <- peakSet[!overlapsAny(peakSet, blacklist)]
+proj@peakSet <- peakSet_filter
 proj <- addPeakMatrix(proj, force = TRUE)
-
 #Save Peak Matrix
 Filter_by_proportion <- function(x, proportion){
     Binary_df = (x > 0)
@@ -39,7 +50,7 @@ write.table(x = Count_cells, file="./Peak_df/ArchR_cattle/Count_Cells.txt", sep=
 write.table(x = Count_peaks, file="./Peak_df/ArchR_cattle/Count_Peaks.txt", sep='\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 #Get pesudobulk accessibility
-meta = proj@cellColData
+meta <- as.data.frame(proj@cellColData)
 celltype_list = gsub("/| ","-",unique(proj$main))
 write.table(celltype_list, file="celltype_list", sep='\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
 Samples = unique(proj$Sample)
@@ -70,11 +81,61 @@ for (temp_sample in Samples){
         Used_meta = meta[gsub("/| ", "-", meta$main)==temp_celltype, ]
         Used_meta = Used_meta[Used_meta$Sample==temp_sample, ]
         Used_cell = row.names(Used_meta)
-		if(length(Used_cell) > 1){
+		if(length(Used_cell) > 10){
         Bulk_df = rowSums(datafr[, Used_cell])
         write.table(Bulk_df, output_file, sep='\t', quote=FALSE)}
     }}
 }
+
+meta$sample_celltype <- paste0(meta$Sample, "_", meta$main)
+bias_by_sample_celltype <- meta %>%
+  dplyr::group_by(sample_celltype) %>%
+  dplyr::summarise(
+    n_cells = dplyr::n(),
+    TSS_median = median(TSSEnrichment, na.rm = TRUE),
+    TSS_mean = mean(TSSEnrichment, na.rm = TRUE),
+    TSS_sd = sd(TSSEnrichment, na.rm = TRUE),
+    log10_nFrags_median = median(log10(nFrags), na.rm = TRUE),
+    log10_nFrags_mean = mean(log10(nFrags), na.rm = TRUE),
+    log10_nFrags_sd = sd(log10(nFrags), na.rm = TRUE),
+    .groups = "drop"
+  )
+write.table(bias_by_sample_celltype, "./Peak_df/DA_CRE/sample_celltype_bias_median.txt", sep = "\t", quote = FALSE, row.names = FALSE)
+
+#tissue and celltypes
+dir.create("./Peak_df/DA_CRE_byTissue", showWarnings = FALSE, recursive = TRUE)
+all_tissues <- unique(sub("\\d$", "", Samples))
+for (temp_tissue in all_tissues) {
+    tissue_samples <- Samples[sub("\\d$", "", Samples) == temp_tissue]
+    for (temp_celltype in celltype_list) {
+        if (paste(temp_celltype, temp_tissue, sep = "_x_") %in% tissue_celltype_reserve) {
+            output_file <- paste0("./Peak_df/DA_CRE_byTissue/", temp_tissue, "_", temp_celltype, ".txt")
+            Used_meta <- meta[gsub("/| ", "-", meta$main) == temp_celltype, ]
+            Used_meta <- Used_meta[Used_meta$Sample %in% tissue_samples, ]
+            Used_cell <- row.names(Used_meta)
+            if (length(Used_cell) > 10) {
+                Bulk_df <- rowSums(datafr[, Used_cell, drop = FALSE])
+                write.table(Bulk_df, output_file, sep = "\t", quote = FALSE)
+            }
+        }
+    }
+}
+
+meta$tissue_celltype <- paste0(meta$tissue, "_", meta$main)
+bias_by_tissue_celltype <- meta %>%
+  dplyr::group_by(tissue_celltype) %>%
+  dplyr::summarise(
+    n_cells = dplyr::n(),
+    TSS_median = median(TSSEnrichment, na.rm = TRUE),
+    TSS_mean = mean(TSSEnrichment, na.rm = TRUE),
+    TSS_sd = sd(TSSEnrichment, na.rm = TRUE),
+    log10_nFrags_median = median(log10(nFrags), na.rm = TRUE),
+    log10_nFrags_mean = mean(log10(nFrags), na.rm = TRUE),
+    log10_nFrags_sd = sd(log10(nFrags), na.rm = TRUE),
+    .groups = "drop"
+  )
+fwrite(bias_by_tissue_celltype, "./Peak_df/DA_CRE_byTissue/tissue_celltype_bias_median.txt", sep = "\t")
+
 
 #Only celltypes
 dir.create("./Peak_df/DA_CRE_Onlycelltypes", showWarnings = FALSE, recursive = TRUE)
@@ -82,10 +143,21 @@ for (temp_celltype in celltype_list){
 	output_file = paste0("./Peak_df/DA_CRE_Onlycelltypes/",temp_celltype, '.txt')
 	Used_meta = meta[gsub("/| ","-",meta$main)==temp_celltype, ]
 	Used_cell = row.names(Used_meta)
-	if(length(Used_cell) > 1){
+	if(length(Used_cell) > 10){
 	Bulk_df = rowSums(datafr[, Used_cell])
 	write.table(Bulk_df, output_file, sep='\t', quote=FALSE)}
 }
 
-
-  
+bias_by_main <- meta %>%
+  dplyr::group_by(main) %>%
+  dplyr::summarise(
+    n_cells = dplyr::n(),
+    TSS_median = median(TSSEnrichment, na.rm = TRUE),
+    TSS_mean = mean(TSSEnrichment, na.rm = TRUE),
+    TSS_sd = sd(TSSEnrichment, na.rm = TRUE),
+    log10_nFrags_median = median(log10(nFrags), na.rm = TRUE),
+    log10_nFrags_mean = mean(log10(nFrags), na.rm = TRUE),
+    log10_nFrags_sd = sd(log10(nFrags), na.rm = TRUE),
+    .groups = "drop"
+  )
+write.table(bias_by_main, "./Peak_df/DA_CRE_Onlycelltypes/celltype_bias_median.txt", sep = "\t", quote = FALSE, row.names = FALSE)

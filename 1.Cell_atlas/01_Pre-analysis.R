@@ -1,15 +1,21 @@
+#Load packages
+suppressPackageStartupMessages({
 library(Seurat)
 library(Signac)
 library(AnnotationHub)
 library(ArchR)
 library(SingleCellExperiment)
 library(harmony)
-addArchRThreads(threads = 16)
-
-#Read cattle genome data and reference files
 library(BSgenome.Btaurus.UCSC.bosTau9)
 library(TxDb.Btaurus.UCSC.bosTau9.refGene)
 library(org.Bt.eg.db)
+library(tidyverse)
+library(magrittr)
+library(hdf5r)
+})
+
+addArchRThreads(threads = 16)
+#Read cattle genome data and reference files
 genomeAnnotation <- createGenomeAnnotation(genome = BSgenome.Btaurus.UCSC.bosTau9)
 geneAnnotation <- createGeneAnnotation(TxDb = TxDb.Btaurus.UCSC.bosTau9.refGene, OrgDb = org.Bt.eg.db)
 
@@ -31,17 +37,30 @@ for(i in 1:length(organ))
 #Create arrow file
 inputFiles <- list.files(filelist, pattern = '.gz',full.names = TRUE)
 names(inputFiles) <- gsub(".gz", "", list.files(filelist,pattern = ".gz"))
-ArrowFiles <- createArrowFiles(inputFiles = inputFiles,sampleNames = names(inputFiles),minTSS = 2,minFrags = 500,addTileMat = TRUE,addGeneScoreMat = TRUE,geneAnnotation = geneAnnotation,genomeAnnotation = genomeAnnotation)
+ArrowFiles <- createArrowFiles(
+  inputFiles = inputFiles,
+  sampleNames = names(inputFiles),
+  minTSS = 2,
+  minFrags = 500,
+  addTileMat = TRUE,
+  addGeneScoreMat = TRUE,g
+  eneAnnotation = geneAnnotation,
+  genomeAnnotation = genomeAnnotation
+)
+
 #ArrowFiles <- paste0(organ,".arrow")#If the arrow file has already been created
 
-#Create ArchR project
-proj<- ArchRProject(ArrowFiles = ArrowFiles, outputDirectory = paste0("proj_combine_",tissue),copyArrows = FALSE,geneAnnotation = geneAnnotation,genomeAnnotation = genomeAnnotation)
-
+#Create ArchRproject
+proj <- ArchRProject(
+  ArrowFiles = ArrowFiles,
+  outputDirectory = paste0("proj_combine_",tissue),
+  copyArrows = FALSE,
+  geneAnnotation = geneAnnotation,
+  genomeAnnotation = genomeAnnotation
+)
 
 #Create summarized experiment for snRNA
 #############################
-library(tidyverse)
-library(magrittr)
 create_summarized_experiment <- function(organ) {
   dir.ls <- list.files(filelist, pattern = "\\.h5$", full.names = TRUE)
   names(dir.ls) <- organ
@@ -78,6 +97,7 @@ create_summarized_experiment <- function(organ) {
   return(seRNA)
 }
 seRNA <- create_summarized_experiment(organ)
+#saveRDS(seRNA,"seRNA.rds")
 
 #Add paired snRNA data to the ArchR project
 proj <- addGeneExpressionMatrix(input = proj, seRNA = seRNA)
@@ -133,15 +153,15 @@ proj <-addIterativeLSI(ArchRProj = proj,
     depthCol = "nFrags",force = TRUE,
     name = paste0("LSI_ATAC_",set_resolution))
 
-proj <- addHarmony(ArchRProj = proj,reducedDims = paste0("LSI_ATAC_",set_resolution),name = "Harmony_ATAC",groupBy = c("Clusters3","Sample"),force = TRUE)
+proj <- addHarmony(ArchRProj = proj,reducedDims = paste0("LSI_ATAC_",set_resolution), name = "Harmony_ATAC", groupBy = c("Clusters3", "Sample"), force = TRUE)
 
 proj$Clusters3 <- ifelse(grepl("2", proj$Sample), "Mongolian", "Leiqiong")
 proj$tissue <- gsub("[0-9]", "", proj$Sample)
 #proj$tissue <- gsub("fat", "Adipose", proj$tissue)
 
 ##RNA-PCA
-##!Due to the limitations of LSI, RNA dimensionality reduction was changed to be conducted in Seurat.
-##After ArchR2Seurat (see Data_format_conversion.R)
+##!Due to the limitations of LSI, RNA dimensionality reduction was conducted in Seurat.
+# After ArchR2Seurat (see Data_format_conversion.R)
 DefaultAssay(SeuratObject) <- "RNA"
 SeuratObject <- SCTransform(SeuratObject, verbose = FALSE) %>% 
 	RunPCA() %>% 
@@ -191,9 +211,9 @@ proj <- addClusters(proj, reducedDims = "harmony_rna", method = "Seurat", name =
 proj <- addUMAP(ArchRProj = proj, reducedDims = "Harmony_ATAC", name = "UMAP_ATAC", force = TRUE)
 proj <- addUMAP(ArchRProj = proj, reducedDims = "harmony_rna", name = "UMAP_RNA", force = TRUE)
 ##############
-p_rna <- plotEmbedding(proj, name = "Clusters_RNA", embedding = "UMAP_RNA", labelAsFactors=F,plotAs="points", labelMeans=F, rastr = FALSE)
+p_rna <- plotEmbedding(proj, name = "Clusters_RNA", embedding = "UMAP_RNA", labelAsFactors=F, plotAs="points", labelMeans=F, rastr = FALSE)
 p_rna + theme(legend.position = "none")
-p_ATAC <- plotEmbedding(proj, name = "Clusters_ATAC", embedding = "UMAP_ATAC", labelAsFactors=F,plotAs="points", labelMeans=F, rastr = FALSE)
+p_ATAC <- plotEmbedding(proj, name = "Clusters_ATAC", embedding = "UMAP_ATAC", labelAsFactors=F, plotAs="points", labelMeans=F, rastr = FALSE)
 p_ATAC + theme(legend.position = "none")
 
 saveRDS(proj, file = "combine_all_after_filter.rds")

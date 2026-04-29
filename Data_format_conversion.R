@@ -12,6 +12,10 @@ bos_edb <- ah[["AH109513"]]
 annotations <- GetGRangesFromEnsDb(ensdb = bos_edb)
 seqlevels(annotations) <- paste0('chr', seqlevels(annotations))
 
+##If there is no peakmatrix, add it first.
+#1. pathToMacs2 <- findMacs2()
+#2. proj <- addGroupCoverages(ArchRProj = proj, maxCells =2000, groupBy = "Sample", force = TRUE)
+#3. proj <- addReproduciblePeakSet(ArchRProj = proj, groupBy = "Sample", pathToMacs2 = pathToMacs2, genomeSize = 2.7e+09, cutOff = 0.05, force = TRUE)
 pkm <- getPeakMatrix(proj)
 
 #annotations<-readRDS("~/SC/annotations_ARS.rds")
